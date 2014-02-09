@@ -1,8 +1,6 @@
-#### Encoder. [![wercker status](https://app.wercker.com/status/170727695eeb0c8fef3220cd7585c855 "wercker status")](https://app.wercker.com/project/bykey/170727695eeb0c8fef3220cd7585c855)
-This is a simple wrapper to the json.Marshal, which adds ability to skip some fields
-of structure.  
-Unlike 'render' package it doesn't write anything, just returns marshalled data.  
-It's useful for things like passwords, statuses, activation codes, etc... 
+# encoder [![wercker status](https://app.wercker.com/status/170727695eeb0c8fef3220cd7585c855 "wercker status")](https://app.wercker.com/project/bykey/170727695eeb0c8fef3220cd7585c855)
+
+This is a simple wrapper to the json.Marshal, which adds ability to skip some fields of structure. Unlike 'render' package it doesn't write anything, just returns marshalled data. It's useful for things like passwords, statuses, activation codes, etc... 
 
 E.g.:
 
