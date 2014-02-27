@@ -69,8 +69,21 @@ func copyStruct(v reflect.Value, t reflect.Type) reflect.Value {
 			continue
 		}
 
-		if v.Field(i).Kind() == reflect.Struct {
-			result.Field(i).Set(copyStruct(v.Field(i), t.Field(i).Type))
+		vfield := v.Field(i)
+
+		if vfield.Kind() == reflect.Interface {
+			vfield = vfield.Elem()
+
+			for vfield.Kind() == reflect.Ptr {
+				vfield = vfield.Elem()
+			}
+
+			result.Field(i).Set(copyStruct(vfield, reflect.TypeOf(vfield.Interface())))
+			continue
+		}
+
+		if vfield.Kind() == reflect.Struct {
+			result.Field(i).Set(copyStruct(vfield, t.Field(i).Type))
 			continue
 		}
 
