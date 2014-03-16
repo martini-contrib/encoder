@@ -55,3 +55,26 @@ func TestInterface(t *testing.T) {
 		t.Fatalf("Expected empty field 'Hidden', got %v\n", dst.Ref.(*Sample).Hidden)
 	}
 }
+
+type ArrayContainer struct {
+	AnArray []Sample `json:"an_array"`
+}
+
+func TestArray(t *testing.T) {
+	src := &ArrayContainer{AnArray: []Sample{Sample{Visible: "visible"}}}
+	dst := &ArrayContainer{AnArray: []Sample{Sample{}}}
+
+	enc := &JsonEncoder{}
+	result, err := enc.Encode(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := json.Unmarshal(result, dst); err != nil {
+		t.Fatal("Unmarshal error:", err)
+	}
+
+	if dst.AnArray[0].Visible != "visible" {
+		t.Fatalf("Expected field 'Visible' to be copied, it was not.")
+	}
+}

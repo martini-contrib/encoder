@@ -85,9 +85,21 @@ func copyStruct(v reflect.Value, t reflect.Type) reflect.Value {
 		if vfield.Kind() == reflect.Struct {
 			result.Field(i).Set(copyStruct(vfield, t.Field(i).Type))
 			continue
+		} else if vfield.Kind() == reflect.Array || vfield.Kind() == reflect.Slice {
+			result_collection := reflect.MakeSlice(vfield.Type(), 0, vfield.Len())
+
+			for j := 0; j < vfield.Len(); j++ {
+				value := vfield.Index(j)
+				result_collection = reflect.Append(result_collection, copyStruct(value, value.Type()))
+			}
+
+			result.Field(i).Set(result_collection)
+			continue
 		}
 
-		result.Field(i).Set(v.Field(i))
+		if result.Field(i).CanSet() {
+			result.Field(i).Set(vfield)
+		}
 	}
 
 	return result
