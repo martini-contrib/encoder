@@ -6,7 +6,9 @@ package encoder
 // Supported tags:
 // 	 - "out" if it sets to "false", value won't be set to field
 import (
+	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"reflect"
 )
 
@@ -28,7 +30,6 @@ func Must(data []byte, err error) []byte {
 
 type JsonEncoder struct{}
 
-// jsonEncoder is an Encoder that produces JSON-formatted responses.
 func (_ JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
 	var data interface{} = v
 	var result interface{}
@@ -47,7 +48,7 @@ func (_ JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
 	}
 
 	if t.Kind() == reflect.Struct {
-		result = copyStruct(reflect.ValueOf(data), t).Interface()
+		result = copyStruct(reflect.ValueOf(data)).Interface()
 	} else {
 		result = data
 	}
@@ -57,40 +58,79 @@ func (_ JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
 	return b, err
 }
 
-func copyStruct(v reflect.Value, t reflect.Type) reflect.Value {
-	result := reflect.New(t).Elem()
+type XmlEncoder struct{}
 
+// Since we don't use xml as a binding source, we don't need to use
+// copyStruct here. Just Marshal.
+func (_ XmlEncoder) Encode(v ...interface{}) ([]byte, error) {
+	var data interface{} = v
+	var buffer bytes.Buffer
+
+	if v == nil {
+		data = []interface{}{}
+	} else if len(v) == 1 {
+		data = v[0]
+	}
+
+	if _, err := buffer.Write([]byte(xml.Header)); err != nil {
+		return []byte{}, err
+	}
+
+	b, err := xml.Marshal(data)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	buffer.Write(b)
+
+	return buffer.Bytes(), nil
+}
+
+func copyStruct(v reflect.Value) reflect.Value {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 
+	result := reflect.New(v.Type()).Elem()
+
+	t := v.Type()
+
 	for i := 0; i < v.NumField(); i++ {
+		vfield := v.Field(i)
+
 		if tag := t.Field(i).Tag.Get("out"); tag == "false" {
 			continue
 		}
 
-		vfield := v.Field(i)
-
-		if vfield.Kind() == reflect.Interface {
+		if vfield.Kind() == reflect.Interface && vfield.Interface() != nil {
 			vfield = vfield.Elem()
 
 			for vfield.Kind() == reflect.Ptr {
 				vfield = vfield.Elem()
 			}
 
-			result.Field(i).Set(copyStruct(vfield, reflect.TypeOf(vfield.Interface())))
+			result.Field(i).Set(copyStruct(vfield))
 			continue
 		}
 
-		if vfield.Kind() == reflect.Struct {
-			result.Field(i).Set(copyStruct(vfield, t.Field(i).Type))
+		if vfield.Kind() == reflect.Struct || vfield.Kind() == reflect.Ptr {
+			r := copyStruct(vfield)
+
+			if result.Field(i).Kind() == reflect.Ptr {
+				result.Field(i).Set(reflect.New(r.Type()))
+			} else {
+				result.Field(i).Set(r)
+			}
+
 			continue
-		} else if vfield.Kind() == reflect.Array || vfield.Kind() == reflect.Slice {
+		}
+
+		if vfield.Kind() == reflect.Array || vfield.Kind() == reflect.Slice {
 			result_collection := reflect.MakeSlice(vfield.Type(), 0, vfield.Len())
 
 			for j := 0; j < vfield.Len(); j++ {
 				value := vfield.Index(j)
-				result_collection = reflect.Append(result_collection, copyStruct(value, value.Type()))
+				result_collection = reflect.Append(result_collection, copyStruct(value))
 			}
 
 			result.Field(i).Set(result_collection)
