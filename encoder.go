@@ -30,6 +30,7 @@ func Must(data []byte, err error) []byte {
 
 type JsonEncoder struct{}
 
+// @todo test for slice of structure support
 func (_ JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
 	var data interface{} = v
 	var result interface{}
@@ -43,19 +44,22 @@ func (_ JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
 
 	t := reflect.TypeOf(data)
 
-	if t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 
-	if t.Kind() == reflect.Struct {
+	switch t.Kind() {
+	case reflect.Slice:
+		result = iterateSlice(reflect.ValueOf(data)).Interface()
+
+	case reflect.Struct:
 		result = copyStruct(reflect.ValueOf(data)).Interface()
-	} else {
+
+	default:
 		result = data
 	}
 
-	b, err := json.Marshal(result)
-
-	return b, err
+	return json.Marshal(result)
 }
 
 type XmlEncoder struct{}
@@ -126,20 +130,24 @@ func copyStruct(v reflect.Value) reflect.Value {
 		}
 
 		if vfield.Kind() == reflect.Array || vfield.Kind() == reflect.Slice {
-			result_collection := reflect.MakeSlice(vfield.Type(), 0, vfield.Len())
-
-			for j := 0; j < vfield.Len(); j++ {
-				value := vfield.Index(j)
-				result_collection = reflect.Append(result_collection, copyStruct(value))
-			}
-
-			result.Field(i).Set(result_collection)
+			result.Field(i).Set(iterateSlice(vfield))
 			continue
 		}
 
 		if result.Field(i).CanSet() {
 			result.Field(i).Set(vfield)
 		}
+	}
+
+	return result
+}
+
+func iterateSlice(v reflect.Value) reflect.Value {
+	result := reflect.MakeSlice(v.Type(), 0, v.Len())
+
+	for i := 0; i < v.Len(); i++ {
+		value := v.Index(i)
+		result = reflect.Append(result, copyStruct(value))
 	}
 
 	return result
