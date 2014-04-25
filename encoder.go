@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"reflect"
+	"time"
 )
 
 // An Encoder implements an encoding format of values to be sent as response to
@@ -103,6 +104,11 @@ func copyStruct(v reflect.Value) reflect.Value {
 		vfield := v.Field(i)
 
 		if tag := t.Field(i).Tag.Get("out"); tag == "false" {
+			continue
+		}
+
+		if vfield.Type() == reflect.TypeOf(time.Time{}) {
+			result.Field(i).Set(vfield)
 			continue
 		}
 
