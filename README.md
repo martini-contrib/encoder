@@ -23,7 +23,7 @@ m.Use(func(c martini.Context, w http.ResponseWriter) {
 })
 ```
 
-If `encoder.JsonEncoder.PrettyPrint` is `true`, thant encoder uses json.MarshalIndent and produce human friendly JSON format.
+If `encoder.JsonEncoder.PrettyPrint` is `true`, thant encoder uses json.MarshalIndent to produce human friendly JSON format.
  
 
 Here is a ready to use example:
