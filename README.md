@@ -18,10 +18,13 @@ It's pretty straightforward:
 
 ```go
 m.Use(func(c martini.Context, w http.ResponseWriter) {
-	c.MapTo(encoder.JsonEncoder{}, (*encoder.Encoder)(nil))
+	c.MapTo(encoder.JsonEncoder{PrettyPrint: false}, (*encoder.Encoder)(nil))
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 })
 ```
+
+If `encoder.JsonEncoder.PrettyPrint` is `true`, thant encoder uses json.MarshalIndent to produce human friendly JSON format.
+ 
 
 Here is a ready to use example:
 
@@ -45,8 +48,9 @@ func main() {
 	route := martini.NewRouter()
 
 	// map json encoder
-	m.Use(func(c martini.Context, w http.ResponseWriter) {
-		c.MapTo(encoder.JsonEncoder{}, (*encoder.Encoder)(nil))
+	m.Use(func(c martini.Context, w http.ResponseWriter, r *http.Request) {
+	    pretty, _ := strconv.ParseBool(r.FormValue("pretty"))
+		c.MapTo(encoder.JsonEncoder{PrettyPrint: pretty}, (*encoder.Encoder)(nil))
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	})
 

@@ -29,10 +29,12 @@ func Must(data []byte, err error) []byte {
 	return data
 }
 
-type JsonEncoder struct{}
+type JsonEncoder struct {
+	PrettyPrint bool
+}
 
 // @todo test for slice of structure support
-func (_ JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
+func (self JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
 	var data interface{} = v
 	var result interface{}
 
@@ -60,7 +62,11 @@ func (_ JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
 		result = data
 	}
 
-	return json.Marshal(result)
+	if self.PrettyPrint {
+		return json.MarshalIndent(result, "", "	")
+	} else {
+		return json.Marshal(result)
+	}
 }
 
 type XmlEncoder struct{}
