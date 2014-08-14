@@ -46,7 +46,6 @@ func (self JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
 	}
 
 	t := reflect.TypeOf(data)
-
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
@@ -159,7 +158,12 @@ func iterateSlice(v reflect.Value) reflect.Value {
 
 	for i := 0; i < v.Len(); i++ {
 		value := v.Index(i)
-		result = reflect.Append(result, copyStruct(value))
+		vi := copyStruct(value)
+		if value.Kind() == reflect.Ptr {
+			result = reflect.Append(result, vi.Addr())
+		} else {
+			result = reflect.Append(result, vi)
+		}
 	}
 
 	return result
