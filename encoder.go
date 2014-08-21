@@ -158,6 +158,12 @@ func iterateSlice(v reflect.Value) reflect.Value {
 
 	for i := 0; i < v.Len(); i++ {
 		value := v.Index(i)
+
+		if value.Kind() == reflect.Slice || value.Kind() == reflect.Array {
+			result = reflect.Append(result, iterateSlice(value))
+			continue
+		}
+
 		vi := copyStruct(value)
 		if value.Kind() == reflect.Ptr {
 			result = reflect.Append(result, vi.Addr())
