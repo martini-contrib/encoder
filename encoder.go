@@ -164,7 +164,11 @@ func iterateSlice(v reflect.Value) reflect.Value {
 			continue
 		}
 
-		vi := copyStruct(value)
+		vi := value
+		if value.Kind() == reflect.Struct {
+			vi = copyStruct(value)
+		}
+
 		if value.Kind() == reflect.Ptr {
 			result = reflect.Append(result, vi.Addr())
 		} else {
