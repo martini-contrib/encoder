@@ -132,7 +132,7 @@ func copyStruct(v reflect.Value) reflect.Value {
 			r := copyStruct(vfield)
 
 			if result.Field(i).Kind() == reflect.Ptr {
-				result.Field(i).Set(reflect.New(r.Type()))
+				result.Field(i).Set(r.Addr())
 			} else {
 				result.Field(i).Set(r)
 			}
