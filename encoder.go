@@ -1,27 +1,20 @@
 package encoder
 
-// Original code borrowed from https://github.com/PuerkitoBio/martini-api-example
-// TextEncoder and XmlEncoder has been removed. If someone really needs it, let me know.
-
-// Supported tags:
-// 	 - "out" if it sets to "false", value won't be set to field
 import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"reflect"
-	"time"
 )
 
-// An Encoder implements an encoding format of values to be sent as response to
-// requests on the API endpoints.
 type Encoder interface {
-	Encode(v ...interface{}) ([]byte, error)
+	Encode(v interface{}) ([]byte, error)
 }
 
-// Because `panic`s are caught by martini's Recovery handler, it can be used
-// to return server-side errors (500). Some helpful text message should probably
-// be sent, although not the technical error (which is printed in the log).
+type Filter interface {
+	Filter() interface{}
+}
+
 func Must(data []byte, err error) []byte {
 	if err != nil {
 		panic(err)
@@ -31,150 +24,75 @@ func Must(data []byte, err error) []byte {
 
 type JsonEncoder struct {
 	PrettyPrint bool
+	PrintNull   bool // if true, empty object will be 'null', '{}' instead (by default)
 }
 
-// @todo test for slice of structure support
-func (self JsonEncoder) Encode(v ...interface{}) ([]byte, error) {
-	var data interface{} = v
-	var result interface{}
+func (e JsonEncoder) Encode(obj interface{}) ([]byte, error) {
+	obj, _ = filter(obj)
 
-	if v == nil {
-		// So that empty results produces `[]` and not `null`
-		data = []interface{}{}
-	} else if len(v) == 1 {
-		data = v[0]
+	if obj == nil && !e.PrintNull {
+		obj = struct{}{}
 	}
 
-	t := reflect.TypeOf(data)
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	switch t.Kind() {
-	case reflect.Slice:
-		result = iterateSlice(reflect.ValueOf(data)).Interface()
-
-	case reflect.Struct:
-		result = copyStruct(reflect.ValueOf(data)).Interface()
-
-	default:
-		result = data
-	}
-
-	if self.PrettyPrint {
-		return json.MarshalIndent(result, "", "	")
+	if e.PrettyPrint {
+		return json.MarshalIndent(obj, "", "    ")
 	} else {
-		return json.Marshal(result)
+		return json.Marshal(obj)
 	}
 }
 
-type XmlEncoder struct{}
+type XmlEncoder struct {
+	PrettyPrint bool
+}
 
-// Since we don't use xml as a binding source, we don't need to use
-// copyStruct here. Just Marshal.
-func (_ XmlEncoder) Encode(v ...interface{}) ([]byte, error) {
-	var data interface{} = v
+func (e XmlEncoder) Encode(obj interface{}) ([]byte, error) {
 	var buffer bytes.Buffer
+	var err error
+	var b []byte
 
-	if v == nil {
-		data = []interface{}{}
-	} else if len(v) == 1 {
-		data = v[0]
-	}
+	obj, _ = filter(obj)
 
 	if _, err := buffer.Write([]byte(xml.Header)); err != nil {
 		return []byte{}, err
 	}
 
-	b, err := xml.Marshal(data)
+	if e.PrettyPrint {
+		b, err = xml.MarshalIndent(obj, "", "    ")
+	} else {
+		b, err = xml.Marshal(obj)
+	}
+
 	if err != nil {
 		return []byte{}, err
 	}
 
 	buffer.Write(b)
-
 	return buffer.Bytes(), nil
 }
 
-func copyStruct(v reflect.Value) reflect.Value {
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
+func filter(obj interface{}) (interface{}, error) {
+	v := reflect.ValueOf(obj)
+	k := v.Kind()
+
+	if k == reflect.Ptr && v.IsNil() {
+		return nil, nil
 	}
 
-	result := reflect.New(v.Type()).Elem()
+	if k == reflect.Array || k == reflect.Slice {
+		result := make([]interface{}, 0)
 
-	t := v.Type()
-
-	for i := 0; i < v.NumField(); i++ {
-		vfield := v.Field(i)
-
-		if tag := t.Field(i).Tag.Get("out"); tag == "false" {
-			continue
-		}
-
-		if vfield.Type() == reflect.TypeOf(time.Time{}) {
-			result.Field(i).Set(vfield)
-			continue
-		}
-
-		if vfield.Kind() == reflect.Interface && vfield.Interface() != nil {
-			vfield = vfield.Elem()
-
-			for vfield.Kind() == reflect.Ptr {
-				vfield = vfield.Elem()
+		for i := 0; i < v.Len(); i++ {
+			obj := v.Index(i).Interface()
+			if f, ok := obj.(Filter); ok {
+				result = append(result, f.Filter())
 			}
-
-			result.Field(i).Set(copyStruct(vfield))
-			continue
 		}
-
-		if vfield.Kind() == reflect.Struct || vfield.Kind() == reflect.Ptr {
-			r := copyStruct(vfield)
-
-			if result.Field(i).Kind() == reflect.Ptr {
-				result.Field(i).Set(r.Addr())
-			} else {
-				result.Field(i).Set(r)
-			}
-
-			continue
-		}
-
-		if vfield.Kind() == reflect.Array || vfield.Kind() == reflect.Slice {
-			result.Field(i).Set(iterateSlice(vfield))
-			continue
-		}
-
-		if result.Field(i).CanSet() {
-			result.Field(i).Set(vfield)
+		return result, nil
+	} else {
+		if f, ok := obj.(Filter); ok {
+			return f.Filter(), nil
 		}
 	}
 
-	return result
-}
-
-func iterateSlice(v reflect.Value) reflect.Value {
-	result := reflect.MakeSlice(v.Type(), 0, v.Len())
-
-	for i := 0; i < v.Len(); i++ {
-		value := v.Index(i)
-
-		if value.Kind() == reflect.Slice || value.Kind() == reflect.Array {
-			result = reflect.Append(result, iterateSlice(value))
-			continue
-		}
-
-		vi := value
-		if value.Kind() == reflect.Struct {
-			vi = copyStruct(value)
-		}
-
-		if value.Kind() == reflect.Ptr {
-			result = reflect.Append(result, vi.Addr())
-		} else {
-			result = reflect.Append(result, vi)
-		}
-	}
-
-	return result
+	return nil, nil
 }
