@@ -29,7 +29,6 @@ type JsonEncoder struct {
 
 func (e JsonEncoder) Encode(obj interface{}) ([]byte, error) {
 	obj, _ = filter(obj)
-
 	if obj == nil && !e.PrintNull {
 		obj = struct{}{}
 	}
@@ -92,6 +91,8 @@ func filter(obj interface{}) (interface{}, error) {
 		if f, ok := obj.(Filter); ok {
 			return f.Filter(), nil
 		}
+
+		return obj, nil
 	}
 
 	return nil, nil
