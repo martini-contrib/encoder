@@ -84,6 +84,8 @@ func filter(obj interface{}) (interface{}, error) {
 			obj := v.Index(i).Interface()
 			if f, ok := obj.(Filter); ok {
 				result = append(result, f.Filter())
+			} else {
+				result = append(result, obj)
 			}
 		}
 		return result, nil
